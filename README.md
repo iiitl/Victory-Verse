@@ -36,7 +36,7 @@ npm run dev
 
 ---
 
-## FOSS Weekend Hackathon
+## FOSS Weekend 
 
 We are looking for contributors to help us improve VictoryVerse! We have curated a list of issues ranging from "Good First Issues" to "Expert Challenges".
 
