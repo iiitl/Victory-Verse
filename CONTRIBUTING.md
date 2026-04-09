@@ -50,7 +50,7 @@ npx hardhat node
 
 ## Contribution Workflow
 
-1. **Pick an Issue**: Head over to [ISSUES.md](./ISSUES.md) and find a task that catches your eye.
+1. **Pick an Issue**: Head over to issues and find a task that catches your eye.
 2. **Branching**: Create a new branch for your work:
    ```bash
    git checkout -b feature/issue-number-short-description
