@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract EventManager is ERC721URIStorage, Ownable {
     uint256 public eventCount;
     uint256 public tokenIdCounter;
+    uint256 totalFunds=0;
 
     mapping(uint256 => mapping(address => bool)) public isRegistered;
     mapping(address => mapping(uint256 => uint256)) public userNFTs;
@@ -17,6 +18,7 @@ contract EventManager is ERC721URIStorage, Ownable {
     event ParticipantRegistered(uint256 indexed eventId, address indexed participant);
     event WinnerDeclared(uint256 indexed eventId, address indexed winner, uint256 tokenId);
     event FanTokensPurchased(uint256 indexed eventId, address indexed buyer, uint256 amount, uint256 cost);
+    event RevenueWithdrawn(uint256 indexed eventId, address indexed creator, uint256 amount);
 
     struct EventInfo {
         uint256 id;
@@ -34,6 +36,7 @@ contract EventManager is ERC721URIStorage, Ownable {
 
     mapping(uint256 => EventInfo) public events;
     mapping(uint256 => address[]) public eventParticipants;
+    mapping(uint256 => uint256) public eventRevenue;
 
     constructor() ERC721("EventNFT", "EVNT") Ownable(msg.sender) {}
 
@@ -110,16 +113,41 @@ contract EventManager is ERC721URIStorage, Ownable {
 
         token.transfer(msg.sender, cost);
         userFanTokenBalance[msg.sender][_eventId] += _amount;
+        eventRevenue[_eventId]+=cost;
+        totalFunds+=cost;
 
         if (msg.value > cost) {
             payable(msg.sender).transfer(msg.value - cost);
         }
+
+
 
         // Increase price by 1%
         e.fanTokenPrice = (e.fanTokenPrice * (100 + _amount)) / 100;
 
         emit FanTokensPurchased(_eventId, msg.sender, _amount, cost);
     }
+
+    function withdrawRevenue(uint256 _eventId) external{
+        require(eventRevenue[_eventId]>0,"No revenue to withdraw");
+        require(msg.sender==events[_eventId].creator, "You are not the creater of this event");
+        uint256 cost=eventRevenue[_eventId];
+        totalFunds-=eventRevenue[_eventId];
+        eventRevenue[_eventId]=0;
+        (bool success, )=msg.sender.call{value:  cost}("");
+        require(success,"Transaction failed");
+
+       emit  RevenueWithdrawn( _eventId, events[_eventId].creator, cost);
+        
+    }
+
+function withdrawContractBalance() external onlyOwner {
+    uint256 _amount = address(this).balance - totalFunds;
+    require(_amount > 0, "No funds to withdraw");
+    (bool success, ) = msg.sender.call{value: _amount}("");
+    require(success, "Transaction Failed");
+}
+
 
     function getAllEvents() public view returns (EventInfo[] memory) {
         EventInfo[] memory allEvents = new EventInfo[](eventCount);
