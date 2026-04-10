@@ -40,8 +40,6 @@ npm run dev
 
 We are looking for contributors to help us improve VictoryVerse! We have curated a list of issues ranging from "Good First Issues" to "Expert Challenges".
 
-### View the Issues
-Check the detailed list here: **[ISSUES.md](./ISSUES.md)**
 
 ### Issue Categories
 - **Easy**: Optimization and UI bugs.
