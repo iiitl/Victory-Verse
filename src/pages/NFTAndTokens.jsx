@@ -2,23 +2,10 @@ import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import Navbar from "../components/Navbar";
 import EventManagerABI from "../contracts/EventManagerABI.json";
+import { fetchImageFromMetadata } from "../utils/ipfsHelpers";
 
 const contractAddress = "0xfCE92d5Ae12694Bf335f85f415093fC8efEEF135";
 
-const convertToGatewayUrl = (ipfsUri) => ipfsUri.replace("ipfs://", "https://ipfs.io/ipfs/");
-
-const fetchImageFromMetadata = async (metadataURI) => {
-  try {
-    const gatewayUrl = convertToGatewayUrl(metadataURI);
-    const response = await fetch(gatewayUrl);
-    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-    const metadata = await response.json();
-    return metadata.image ? convertToGatewayUrl(metadata.image) : null;
-  } catch (error) {
-    console.error("Error fetching metadata:", error);
-    return null;
-  }
-};
 
 const NFTAndTokens = () => {
   const [events, setEvents] = useState([]);
@@ -48,7 +35,7 @@ const NFTAndTokens = () => {
         const eventData = await contract.events(i);
         if (eventData.winner === "0x0000000000000000000000000000000000000000") continue;
 
-        const imageUrl = await fetchImageFromMetadata(eventData.meta_uri);
+        const imageUrl = await fetchImageFromMetadata(eventData.meta_uri, { convertImage: true });
         all.push({
           id: i,
           name: eventData.eventName,
