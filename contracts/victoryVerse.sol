@@ -99,6 +99,9 @@ contract EventManager is ERC721URIStorage, Ownable {
     }
 
     function purchaseFanTokens(uint256 _eventId, uint256 _amount) public payable {
+        require(_amount > 0, "Amount must be positive");
+        require(_amount <= 1000, "Max 1000 tokens per transaction");
+
         EventInfo storage e = events[_eventId];
         require(e.winnerDeclared, "Event not concluded");
 
@@ -108,7 +111,7 @@ contract EventManager is ERC721URIStorage, Ownable {
         EventToken token = EventToken(e.fanTokenAddress);
         require(token.balanceOf(address(this)) >= _amount, "Not enough tokens");
 
-        token.transfer(msg.sender, cost);
+        token.transfer(msg.sender, _amount);
         userFanTokenBalance[msg.sender][_eventId] += _amount;
 
         if (msg.value > cost) {
@@ -116,7 +119,7 @@ contract EventManager is ERC721URIStorage, Ownable {
         }
 
         // Increase price by 1%
-        e.fanTokenPrice = (e.fanTokenPrice * (100 + _amount)) / 100;
+        e.fanTokenPrice = (e.fanTokenPrice * 101) / 100;
 
         emit FanTokensPurchased(_eventId, msg.sender, _amount, cost);
     }
