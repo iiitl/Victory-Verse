@@ -4,13 +4,13 @@ import Navbar from "../components/Navbar";
 import EventManagerABI from "../contracts/EventManagerABI.json";
 
 const contractAddress = "0xfCE92d5Ae12694Bf335f85f415093fC8efEEF135";
+const EVENTS_PER_CHUNK = 50;
 
-// Helper to convert an IPFS URI (ipfs://CID) to a gateway URL.
 const convertToGatewayUrl = (ipfsUri) => {
+  if (!ipfsUri) return "";
   return ipfsUri.replace("ipfs://", "https://ipfs.io/ipfs/");
 };
 
-// Fetch metadata JSON from IPFS and return the "image" field.
 const fetchImageFromMetadata = async (metadataURI) => {
   try {
     const gatewayUrl = convertToGatewayUrl(metadataURI);
@@ -19,14 +19,13 @@ const fetchImageFromMetadata = async (metadataURI) => {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
     const metadata = await response.json();
-    return metadata.image; 
+    return metadata.image;
   } catch (error) {
     console.error("Error fetching metadata:", error);
     return null;
   }
 };
 
-// Skeleton Loading Components
 const EventCardSkeleton = () => (
   <div className="group bg-black/30 backdrop-blur-sm rounded-xl overflow-hidden border border-gray-700/50 shadow-xl shadow-gray-900/20 animate-pulse">
     <div className="relative h-48 w-full bg-gray-700/50"></div>
@@ -46,69 +45,109 @@ const SectionHeaderSkeleton = () => (
 const MyEvents = () => {
   const [createdEvents, setCreatedEvents] = useState([]);
   const [participatedEvents, setParticipatedEvents] = useState([]);
+
+  const [currentOffset, setCurrentOffset] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [navbarHeight, setNavbarHeight] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const navbar = document.querySelector("nav");
     if (navbar) {
       setNavbarHeight(navbar.offsetHeight);
     }
-    
-    const fetchEvents = async () => {
-      if (!window.ethereum) {
-        setIsLoading(false);
+
+    fetchEventsChunk(1);
+  }, []);
+
+  const fetchEventsChunk = async (offset) => {
+    if (!window.ethereum) {
+      setIsInitialLoading(false);
+      return;
+    }
+
+    try {
+      if (offset === 1) setIsInitialLoading(true);
+      else setIsLoadingMore(true);
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const userAddress = await signer.getAddress();
+      const contract = new ethers.Contract(contractAddress, EventManagerABI.abi, signer);
+
+      const [paginatedData, totalCountRaw] = await contract.getEventsPaginated(offset, EVENTS_PER_CHUNK);
+      const totalCount = Number(totalCountRaw);
+
+      if (totalCount === 0 || paginatedData.length === 0) {
+        setHasMore(false);
+        setIsInitialLoading(false);
+        setIsLoadingMore(false);
         return;
       }
-      
-      try {
-        setIsLoading(true);
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const signer = await provider.getSigner();
-        const userAddress = await signer.getAddress();
-        const contract = new ethers.Contract(contractAddress, EventManagerABI.abi, signer);
 
-        const count = await contract.eventCount();
-        const myCreated = [];
-        const myParticipated = [];
+      const chunkCreated = [];
+      const chunkParticipated = [];
 
-        for (let i = 1; i <= count; i++) {
-          const event = await contract.events(i);
+      await Promise.all(
+        paginatedData.map(async (event, index) => {
+          const eventId = offset + index;
 
-          const image = await fetchImageFromMetadata(event.meta_uri);
+          if (!event.creator || event.creator === ethers.ZeroAddress) return;
+
+          const [image, isRegistered] = await Promise.all([
+            fetchImageFromMetadata(event.meta_uri),
+            contract.isRegistered(eventId, userAddress)
+          ]);
+
           const eventData = {
-            id: i,
+            id: eventId,
             name: event.eventName,
             creator: event.creator,
             winner: event.winner,
             winnerDeclared: event.winnerDeclared,
             meta_uri: event.meta_uri,
-            img: image, 
+            img: image,
           };
 
           if (event.creator.toLowerCase() === userAddress.toLowerCase()) {
-            myCreated.push(eventData);
+            chunkCreated.push(eventData);
           }
-          const registered = await contract.isRegistered(i, userAddress);
-          if (registered) {
-            myParticipated.push(eventData);
+          if (isRegistered) {
+            chunkParticipated.push(eventData);
           }
-        }
+        })
+      );
 
-        setCreatedEvents(myCreated);
-        setParticipatedEvents(myParticipated);
-      } catch (err) {
-        console.error("Error fetching events:", err);
-      } finally {
-        setIsLoading(false);
+      if (offset === 1) {
+        setCreatedEvents(chunkCreated);
+        setParticipatedEvents(chunkParticipated);
+      } else {
+        setCreatedEvents(prev => [...prev, ...chunkCreated]);
+        setParticipatedEvents(prev => [...prev, ...chunkParticipated]);
       }
-    };
 
-    fetchEvents();
-  }, []);
+      const nextOffset = offset + EVENTS_PER_CHUNK;
+      setCurrentOffset(nextOffset);
+      setHasMore(nextOffset <= totalCount);
+
+    } catch (err) {
+      console.error("Error fetching events:", err);
+    } finally {
+      setIsInitialLoading(false);
+      setIsLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!isLoadingMore && hasMore) {
+      fetchEventsChunk(currentOffset);
+    }
+  };
 
   const openDeclareWinner = async (eventId) => {
     setSelectedEventId(eventId);
@@ -154,13 +193,12 @@ const MyEvents = () => {
         className="relative z-0 min-h-screen text-white px-6 py-10"
         style={{
           backgroundSize: 'cover',
-          backgroundAttachment: 'fixed', 
+          backgroundAttachment: 'fixed',
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center',
           paddingTop: `calc(${navbarHeight}px + 2rem)`,
         }}
       >
-        {/* Page title */}
         <div className="mb-16">
           <h1 className="text-6xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300">
             My Events
@@ -168,9 +206,8 @@ const MyEvents = () => {
           <div className="w-32 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full mx-auto mt-4"></div>
         </div>
 
-        {/* Created Events Section */}
         <section className="mb-20">
-          {isLoading ? (
+          {isInitialLoading ? (
             <SectionHeaderSkeleton />
           ) : (
             <div className="backdrop-blur-md rounded-xl px-4 py-4 mb-10 bg-gradient-to-r from-indigo-900/30 via-purple-900/30 to-pink-900/30 border border-indigo-800/30">
@@ -181,13 +218,13 @@ const MyEvents = () => {
               </h2>
             </div>
           )}
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-            {isLoading ? (
+            {isInitialLoading ? (
               Array(4).fill(0).map((_, idx) => <EventCardSkeleton key={`created-skeleton-${idx}`} />)
             ) : createdEvents.length === 0 ? (
               <div className="col-span-full text-center py-12 bg-black/20 backdrop-blur-sm rounded-xl">
-                <p className="text-gray-400">You haven't created any events yet</p>
+                <p className="text-gray-400">You haven't created any events in this loaded batch</p>
               </div>
             ) : (
               createdEvents.map((event) => (
@@ -212,10 +249,10 @@ const MyEvents = () => {
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="p-5">
                     <h3 className="text-xl font-bold text-white mb-2 tracking-wide">{event.name}</h3>
-                    
+
                     {event.winnerDeclared ? (
                       <div className="mt-4 space-y-2">
                         <div className="flex items-center">
@@ -241,12 +278,13 @@ const MyEvents = () => {
                 </div>
               ))
             )}
+
+            {isLoadingMore && Array(2).fill(0).map((_, idx) => <EventCardSkeleton key={`loading-more-created-${idx}`} />)}
           </div>
         </section>
 
-        {/* Participated Events Section */}
         <section className="mb-16">
-          {isLoading ? (
+          {isInitialLoading ? (
             <SectionHeaderSkeleton />
           ) : (
             <div className="backdrop-blur-md rounded-xl px-4 py-4 mb-10 bg-gradient-to-r from-purple-900/30 via-pink-900/30 to-fuchsia-900/30 border border-pink-800/30">
@@ -257,13 +295,13 @@ const MyEvents = () => {
               </h2>
             </div>
           )}
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {isLoading ? (
+            {isInitialLoading ? (
               Array(4).fill(0).map((_, idx) => <EventCardSkeleton key={`participated-skeleton-${idx}`} />)
             ) : participatedEvents.length === 0 ? (
               <div className="col-span-full text-center py-12 bg-black/20 backdrop-blur-sm rounded-xl">
-                <p className="text-gray-400">You haven't participated in any events yet</p>
+                <p className="text-gray-400">You haven't participated in any events in this loaded batch</p>
               </div>
             ) : (
               participatedEvents.map((event) => (
@@ -288,7 +326,7 @@ const MyEvents = () => {
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="p-4">
                     <h3 className="text-xl font-bold text-white mb-1">{event.name}</h3>
                     {event.winnerDeclared && event.winner.toLowerCase() === event.creator.toLowerCase() && (
@@ -302,15 +340,39 @@ const MyEvents = () => {
                 </div>
               ))
             )}
+
+            {isLoadingMore && Array(2).fill(0).map((_, idx) => <EventCardSkeleton key={`loading-more-participated-${idx}`} />)}
           </div>
         </section>
 
-        {/* Winner Selection Modal */}
+        {hasMore && (
+          <div className="flex justify-center mt-12 pb-12">
+            <button
+              onClick={handleLoadMore}
+              disabled={isLoadingMore}
+              className={`px-8 py-3 rounded-full font-bold text-lg transition-all duration-300 ${
+                isLoadingMore
+                  ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500 shadow-lg shadow-purple-900/40 hover:scale-105 hover:shadow-purple-500/50 text-white'
+              }`}
+            >
+              {isLoadingMore ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Loading More...
+                </span>
+              ) : (
+                "Load Next 50 Events"
+              )}
+            </button>
+          </div>
+        )}
+
         {selectedEventId && (
           <div className="fixed top-0 left-0 right-0 bottom-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-gradient-to-br from-gray-900 to-indigo-900/80 p-6 rounded-2xl w-96 border border-indigo-600/50 shadow-2xl shadow-indigo-600/30">
               <h3 className="text-2xl font-bold text-white mb-6">Select Winner</h3>
-              
+
               {loadingParticipants ? (
                 <div className="py-10 flex flex-col items-center">
                   <div className="w-10 h-10 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -319,8 +381,8 @@ const MyEvents = () => {
               ) : participants.length > 0 ? (
                 <ul className="space-y-3 max-h-80 overflow-y-auto pb-2">
                   {participants.map((addr, idx) => (
-                    <li 
-                      key={idx} 
+                    <li
+                      key={idx}
                       className="flex justify-between items-center bg-black/50 hover:bg-indigo-900/30 px-4 py-3 rounded-lg border border-indigo-800/50 transition duration-200"
                     >
                       <span className="text-sm font-mono text-indigo-200">{addr.slice(0, 6)}...{addr.slice(-4)}</span>
@@ -338,7 +400,7 @@ const MyEvents = () => {
                   <p className="text-gray-300">No participants registered for this event</p>
                 </div>
               )}
-              
+
               <div className="mt-6 flex justify-end">
                 <button
                   className="px-4 py-2 text-indigo-300 hover:text-white transition-colors duration-200"

@@ -66,6 +66,41 @@ contract EventManager is ERC721URIStorage, Ownable {
         return eventCount;
     }
 
+    function getEventsPaginated(uint256 offset, uint256 limit) 
+        public 
+        view 
+        returns (EventInfo[] memory, uint256 total) 
+    {
+        require(offset > 0, "Invalid offset: must be 1-based");
+
+        uint256 _eventCount = eventCount;
+
+        if (_eventCount == 0 || offset > _eventCount) {
+            return (new EventInfo[](0), _eventCount);
+        }
+
+        if (limit > 50) {
+            limit = 50;
+        }
+
+        uint256 end = offset + limit - 1;
+
+        if (end > _eventCount) {
+            end = _eventCount;
+        }
+
+        uint256 size = end - offset + 1;
+        EventInfo[] memory paginatedEvents = new EventInfo[](size);
+
+        uint256 index = 0;
+        for (uint256 i = offset; i <= end; i++) {
+            paginatedEvents[index] = events[i];
+            index++;
+        }
+
+        return (paginatedEvents, _eventCount);
+    }
+
     function registerForEvent(uint256 _eventId) public {
         EventInfo storage e = events[_eventId];
         require(!e.winnerDeclared, "Event concluded");
@@ -121,6 +156,8 @@ contract EventManager is ERC721URIStorage, Ownable {
         emit FanTokensPurchased(_eventId, msg.sender, _amount, cost);
     }
 
+    /// WARNING: This function is unbounded and may fail for large datasets.
+    /// Use getEventsPaginated instead.
     function getAllEvents() public view returns (EventInfo[] memory) {
         EventInfo[] memory allEvents = new EventInfo[](eventCount);
         for (uint256 i = 1; i <= eventCount; i++) {
