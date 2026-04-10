@@ -5,29 +5,14 @@ import { ethers } from "ethers";
 import Navbar from "../components/Navbar";
 import { WalletContext } from "../context/WalletContext";
 import EventManagerABI from "../contracts/EventManagerABI.json";
+import { convertToGatewayUrl } from "../utils/ipfsHelpers";
+import { fetchImageFromMetadata } from "../utils/ipfsHelpers";
 
 const contractAddress = "0xfCE92d5Ae12694Bf335f85f415093fC8efEEF135";
 
-// Convert an IPFS URI (ipfs://CID) to a gateway URL (using ipfs.io)
-const convertToGatewayUrl = (ipfsUri) => {
-  return ipfsUri.replace("ipfs://", "https://ipfs.io/ipfs/");
-};
 
-// Fetch metadata JSON from IPFS and return the "image" field
-const fetchImageFromMetadata = async (metadataURI) => {
-  try {
-    const gatewayUrl = convertToGatewayUrl(metadataURI);
-    const response = await fetch(gatewayUrl);
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-    const metadata = await response.json();
-    return metadata.image; 
-  } catch (error) {
-    console.error("Error fetching metadata:", error);
-    return null;
-  }
-};
+
+
 
 const DeclareWinnerPage = () => {
   const { walletAddress } = useContext(WalletContext);
