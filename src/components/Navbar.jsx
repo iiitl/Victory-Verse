@@ -9,15 +9,53 @@ const Navbar = () => {
 
   // Check if MetaMask is already connected
   useEffect(() => {
-    if (window.ethereum) {
-      window.ethereum.request({ method: 'eth_accounts' }).then(accounts => {
+    if (!window.ethereum) return;
+
+    const checkConnectedWallet = async () => {
+      try {
+        const accounts = await window.ethereum.request({
+          method: 'eth_accounts'
+        });
+
         if (accounts.length > 0) {
           setWalletAddress(accounts[0]);
+        } else {
+          setWalletAddress('');
         }
-      });
-    }
-  }, []);
+      } catch (error) {
+        console.error('Failed to fetch accounts:', error);
+      }
+    };
 
+    const handleAccountsChanged = (accounts) => {
+      if (accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+      } else {
+        setWalletAddress('');
+      }
+    };
+
+    const handleChainChanged = () => {
+      window.location.reload();
+    };
+
+    checkConnectedWallet();
+
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    window.ethereum.on('chainChanged', handleChainChanged);
+
+    return () => {
+      window.ethereum.removeListener(
+        'accountsChanged',
+        handleAccountsChanged
+      );
+      window.ethereum.removeListener(
+        'chainChanged',
+        handleChainChanged
+      );
+    };
+  }, [setWalletAddress]);
+  
   const connectWallet = async () => {
     if (window.ethereum) {
       try {
