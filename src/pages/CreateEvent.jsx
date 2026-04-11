@@ -39,7 +39,38 @@ const CreateEvent = () => {
     const convertToGatewayUrl = (ipfsUri) => {
         return ipfsUri.replace("ipfs://", "https://ipfs.io/ipfs/");
     };
+    const [errors, setErrors] = useState({});
+    const validateForm = () => {
+        const newErrors = {};
 
+        if (!bannerFile) {
+            newErrors.banner = "Please upload a banner image.";
+        }
+
+        const winnerTokens = parseFloat(event.WinnerTokenAmount);
+        const fanTokens = parseFloat(event.FanTokenAmount);
+        const fanPrice = parseFloat(event.FanTokenPrice);
+
+        if (!winnerTokens || winnerTokens <= 0) {
+            newErrors.winnerTokens = "Winner token amount must be greater than 0.";
+        } else if (!Number.isInteger(winnerTokens)) {
+            newErrors.winnerTokens = "Winner token amount must be a whole number.";
+        }
+
+        if (!fanTokens || fanTokens <= 0) {
+            newErrors.fanTokens = "Fan token amount must be greater than 0.";
+        } else if (!Number.isInteger(fanTokens)) {
+            newErrors.fanTokens = "Fan token amount must be a whole number.";
+        }
+
+        if (!fanPrice || fanPrice <= 0) {
+            newErrors.fanPrice = "Fan token price must be greater than 0.";
+        }
+
+        setErrors(newErrors);
+
+        return Object.keys(newErrors).length === 0;
+        };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -48,6 +79,7 @@ const CreateEvent = () => {
             alert("Please connect your wallet first!");
             return;
         }
+        if (!validateForm()) return; 
 
         try {
             // Upload the banner file and retrieve its URL
@@ -70,7 +102,7 @@ const CreateEvent = () => {
                 event.name,
                 ethers.parseEther(event.WinnerTokenAmount),
                 ethers.parseEther(event.FanTokenAmount),
-                ethers.parseEther(event.FanTokenPrice, "wei"),
+                ethers.parseEther(event.FanTokenPrice.toString()),
                 metadataURI,
                 event.description
             );
@@ -152,6 +184,9 @@ const CreateEvent = () => {
                                     className="w-full px-4 py-3 bg-black/30 text-white rounded-xl border border-gray-700 focus:border-cyan-400 focus:ring-0"
                                     required
                                 />
+                                {errors.winnerTokens && (
+                                    <p className="text-red-500 text-sm mt-1">{errors.winnerTokens}</p>
+                                )}
                             </div>
 
                             <div className="space-y-1">
@@ -164,6 +199,9 @@ const CreateEvent = () => {
                                     className="w-full px-4 py-3 bg-black/30 text-white rounded-xl border border-gray-700 focus:border-cyan-400 focus:ring-0"
                                     required
                                 />
+                                {errors.fanTokens && (
+                                    <p className="text-red-500 text-sm mt-1">{errors.fanTokens}</p>
+                                )}
                             </div>
                         </div>
 
@@ -178,6 +216,9 @@ const CreateEvent = () => {
                                 className="w-full px-4 py-3 bg-black/30 text-white rounded-xl border border-gray-700 focus:border-cyan-400 focus:ring-0"
                                 required
                             />
+                            {errors.fanPrice && (
+                                <p className="text-red-500 text-sm mt-1">{errors.fanPrice}</p>
+                            )}
                         </div>
 
                         {/* Description */}
@@ -216,6 +257,9 @@ const CreateEvent = () => {
                                         onChange={handleFileChange}
                                         className="hidden"
                                     />
+                                    {errors.banner && (
+                                        <p className="text-red-500 text-sm mt-1">{errors.banner}</p>
+                                    )}
                                 </label>
                             </div>
                         </div>
