@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState, useContext } from "react";
 import { ethers } from "ethers";
 import Navbar from "../components/Navbar";

@@ -68,6 +68,7 @@ contract EventManager is ERC721URIStorage, Ownable {
 
     function registerForEvent(uint256 _eventId) public {
         EventInfo storage e = events[_eventId];
+        require(msg.sender!=e.creator,"Creator cannot register as participant");
         require(!e.winnerDeclared, "Event concluded");
         require(!isRegistered[_eventId][msg.sender], "Already registered");
 
@@ -78,6 +79,8 @@ contract EventManager is ERC721URIStorage, Ownable {
 
     function declareWinner(uint256 _eventId, address _winner) public {
         EventInfo storage e = events[_eventId];
+        require(_winner!=e.creator,"Creator cannot be declared winner");
+        require(eventParticipants[_eventId].length>=2,"Need at least 2");
         require(msg.sender == e.creator, "Not creator");
         require(!e.winnerDeclared, "Already declared");
         require(isRegistered[_eventId][_winner], "Winner not registered");

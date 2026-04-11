@@ -51,7 +51,7 @@ const MyEvents = () => {
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [navbarHeight, setNavbarHeight] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-
+  
   useEffect(() => {
     const navbar = document.querySelector("nav");
     if (navbar) {
@@ -325,8 +325,12 @@ const MyEvents = () => {
                     >
                       <span className="text-sm font-mono text-indigo-200">{addr.slice(0, 6)}...{addr.slice(-4)}</span>
                       <button
+                        disabled={participants.length<2}
                         onClick={() => declareWinner(addr)}
-                        className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-4 py-1.5 rounded-lg text-sm transition-colors duration-300"
+                        className={
+                          `bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-4 py-1.5 rounded-lg text-sm transition-colors duration-300
+                          ${participants.length<2 ? "opacity-50 cursor-not-allowed":""}`
+                        }
                       >
                         Choose Winner
                       </button>
