@@ -9,10 +9,12 @@ import { ethers } from "ethers";
 import EventManagerABI from "../contracts/EventManagerABI.json";
 import { uploadToPinata } from "../utils/UploadToPinata";
 import { createAndUploadMetadata } from "../utils/UploadMetadataToPinata";
+const VITE_PINATA_JWT_API = import.meta.env.VITE_PINATA_JWT
 
 const CreateEvent = () => {
     const { walletAddress } = useContext(WalletContext);
     const [bannerFile, setBannerFile] = useState(null);
+    const isApiMissing = (!VITE_PINATA_JWT_API||VITE_PINATA_JWT_API === "your_pinata_jwt_here")
     const contractAddress = "0xfCE92d5Ae12694Bf335f85f415093fC8efEEF135";
     const [metadataCID, setMetadataCID] = useState("");
     const [image, setImage] = useState("");
@@ -43,7 +45,10 @@ const CreateEvent = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
+        if (isApiMissing) {
+            alert("Application is not configured correctly. Check VITE_PINATA_JWT.");
+            return;
+        }
         if (!walletAddress) {
             alert("Please connect your wallet first!");
             return;
@@ -123,6 +128,11 @@ const CreateEvent = () => {
                         <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
                             Create New Event
                         </h2>
+                        {isApiMissing && (
+                            <p className="text-red-400 font-bold animate-pulse">
+                                ⚠️ IPFS Uploads Disabled: Missing API Key
+                            </p>
+                        )}
                         <p className="text-sm text-gray-400">Shape your event in the metaverse</p>
                     </div>
 
@@ -223,9 +233,15 @@ const CreateEvent = () => {
 
                     <button
                         type="submit"
-                        className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium rounded-xl shadow-lg transition-all duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-cyan-300/50"
+                        disabled={isApiMissing}
+                        title={isApiMissing ? "API Key missing in .env. Please configure VITE_PINATA_JWT to enable uploads." : ""}
+                        className={`w-full py-3.5 font-medium rounded-xl shadow-lg transition-all duration-300 transform 
+                            ${isApiMissing 
+                                ? "bg-gray-600 cursor-not-allowed opacity-50" 
+                                : "bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 hover:scale-[1.02]"
+                            }`}
                     >
-                        Create Event
+                        {isApiMissing ? "Cannot create event" : "Create Event"}
                     </button>
                 </motion.form>
             </div>
