@@ -99,6 +99,7 @@ contract EventManager is ERC721URIStorage, VRFConsumerBaseV2Plus {
         emit ParticipantRegistered(_eventId, msg.sender);
     }
 
+    bool TLE;
 
     function requestRandomWinner(uint256 _eventId) public returns (uint256 requestId) {
         EventInfo storage e = events[_eventId];
@@ -129,10 +130,8 @@ contract EventManager is ERC721URIStorage, VRFConsumerBaseV2Plus {
 
     function fulfillRandomWords( uint256 requestId, uint256[] calldata randomWords) internal override {
 
-      EventInfo storage e = events[eventCount];
-
-     require(msg.sender == e.creator, "Not creator");
-     uint256 _eventId = Requestors[requestId];
+      uint256 _eventId = Requestors[requestId];
+      EventInfo storage e = events[_eventId];
 
     if(eventParticipants[_eventId].length == 0) {
 
@@ -141,7 +140,8 @@ contract EventManager is ERC721URIStorage, VRFConsumerBaseV2Plus {
      }
 
     if(block.number > requestIdToBlockNumber[requestId] + 256){
-        cancelVRFRequest(requestId);
+        TLE = true;
+        return;
      }
 
      uint256 winnerIndex = randomWords[0] % Results[requestId];
@@ -156,8 +156,10 @@ contract EventManager is ERC721URIStorage, VRFConsumerBaseV2Plus {
 
     function cancelVRFRequest(uint256 requestId) internal{
 
+        require(TLE == true, "waiting for VRF request");
         uint256 _eventId = Requestors[requestId];
         EventInfo storage e = events[eventCount];
+        TLE = false;
 
         require(msg.sender == e.creator, "Only creator can cancel");
         require(e.useVRF == true, "VRF not used");
